@@ -99,7 +99,8 @@ _spin_for_counter_value(StatsCounterItem *counter, gssize expected_value)
       c++;
     }
   cr_assert(expected_value == value,
-            "counter did not reach the expected value after %d seconds, expected_value=%" G_GSSIZE_FORMAT ", value=%" G_GSSIZE_FORMAT,
+            "counter did not reach the expected value after %d seconds, "
+            "expected_value=%" G_GSSIZE_FORMAT ", value=%" G_GSSIZE_FORMAT,
             MAX_SPIN_ITERATIONS / 1000, expected_value, value);
 }
 
@@ -167,14 +168,15 @@ Test(logthrdestdrv, driver_can_be_instantiated_and_one_message_is_properly_proce
   dd->super.worker.insert = _insert_single_message_success;
 
   _generate_message_and_wait_for_processing(dd, dd->super.written_messages);
-  cr_assert(dd->insert_counter == 1);
-  cr_assert(dd->connect_counter == 1);
+  cr_assert(dd->insert_counter == 1,
+            "insert()-ed message count expected to match the amount generated, found %d", dd->insert_counter);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 1);
   cr_assert(stats_counter_get(dd->super.written_messages) == 1);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 0);
   cr_assert(stats_counter_get(dd->super.memory_usage) == 0);
-  cr_assert(dd->super.seq_num == 2);
+  cr_assert(dd->super.seq_num == 2,
+            "seq_num expected to be 1 larger than the amount of messages generated, found %d", dd->super.seq_num);
 }
 
 static worker_insert_result_t
@@ -192,12 +194,14 @@ Test(logthrdestdrv, message_drops_are_accounted_in_the_drop_counter_and_are_repo
 
   start_grabbing_messages();
   _generate_message_and_wait_for_processing(dd, dd->super.dropped_messages);
-  cr_assert(dd->insert_counter == 1);
+  cr_assert(dd->insert_counter == 1,
+              "insert()-ed message count expected to match the amount generated, found %d", dd->insert_counter);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 1);
   cr_assert(stats_counter_get(dd->super.written_messages) == 0);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 1);
-  cr_assert(dd->super.seq_num == 2);
+  cr_assert(dd->super.seq_num == 2,
+            "seq_num expected to be 1 larger than the amount of messages generated, found %d", dd->super.seq_num);
   assert_grabbed_log_contains("dropped while sending");
 }
 
@@ -218,12 +222,14 @@ Test(logthrdestdrv, connection_failure_is_considered_an_error_and_retried_indefi
 
   start_grabbing_messages();
   _generate_message_and_wait_for_processing(dd, dd->super.written_messages);
-  cr_assert(dd->insert_counter == 11);
+  cr_assert(dd->insert_counter == 11,
+            "insert() invocations expected to match 11 (10 failed and 1 successul) attempts, found %d", dd->insert_counter);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 1);
   cr_assert(stats_counter_get(dd->super.written_messages) == 1);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 0);
-  cr_assert(dd->super.seq_num == 12);
+  cr_assert(dd->super.seq_num == 12,
+            "seq_num expected to be 1 larger than the number of insert attempts, found %d", dd->super.seq_num);
   assert_grabbed_log_contains("Server disconnected");
 }
 
@@ -244,12 +250,14 @@ Test(logthrdestdrv, error_result_retries_sending_retry_max_times_and_then_drops)
 
   start_grabbing_messages();
   _generate_message_and_wait_for_processing(dd, dd->super.dropped_messages);
-  cr_assert(dd->insert_counter == 5);
+  cr_assert(dd->insert_counter == 5,
+            "insert() invocations expected to match the number of retry attempts, found %d", dd->insert_counter);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 1);
   cr_assert(stats_counter_get(dd->super.written_messages) == 0);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 1);
-  cr_assert(dd->super.seq_num == 6);
+  cr_assert(dd->super.seq_num == 6,
+            "seq_num expected to be 1 larger than the number of insert attempts, found %d", dd->super.seq_num);
   assert_grabbed_log_contains("Error occurred while");
   assert_grabbed_log_contains("Multiple failures while sending");
 }
@@ -272,12 +280,14 @@ Test(logthrdestdrv, error_result_retries_sending_retry_max_times_and_then_accept
 
   start_grabbing_messages();
   _generate_message_and_wait_for_processing(dd, dd->super.written_messages);
-  cr_assert(dd->insert_counter == 5);
+  cr_assert(dd->insert_counter == 5,
+            "insert() invocations expected to match the number of failed (4) plus the number of successful (1) attempts, found %d", dd->insert_counter);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 1);
   cr_assert(stats_counter_get(dd->super.written_messages) == 1);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 0);
-  cr_assert(dd->super.seq_num == 6);
+  cr_assert(dd->super.seq_num == 6,
+            "seq_num expected to be 1 larger than the number of insert attempts, found %d", dd->super.seq_num);
   assert_grabbed_log_contains("Error occurred while");
 }
 
@@ -310,14 +320,17 @@ Test(logthrdestdrv, batched_set_of_messages_are_successfully_delivered)
   dd->super.worker.flush = _flush_batched_message_success;
 
   _generate_messages_and_wait_for_processing(dd, 10, dd->super.written_messages);
-  cr_assert(dd->insert_counter == 10);
-  cr_assert(dd->flush_size == 10);
+  cr_assert(dd->insert_counter == 10,
+            "insert() invocations expected to match the number of messages generated, found %d", dd->insert_counter);
+  cr_assert(dd->flush_size == 10,
+            "flush_size expected to match the number of messages generated, found %d", dd->flush_size);
 
   cr_assert(stats_counter_get(dd->super.processed_messages) == 10);
   cr_assert(stats_counter_get(dd->super.written_messages) == 10);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 0);
   cr_assert(stats_counter_get(dd->super.memory_usage) == 0);
-  cr_assert(dd->super.seq_num == 11, "%d", dd->super.seq_num);
+  cr_assert(dd->super.seq_num == 11, "%d", dd->super.seq_num,
+            "seq_num expected to be 1 larger than the number of insert attempts, found %d", dd->super.seq_num);
 }
 
 static worker_insert_result_t
@@ -414,7 +427,8 @@ Test(logthrdestdrv, when_batched_set_of_messages_result_in_error_the_entire_batc
   cr_assert(stats_counter_get(dd->super.written_messages) == 0);
   cr_assert(stats_counter_get(dd->super.dropped_messages) == 10);
   cr_assert(stats_counter_get(dd->super.memory_usage) == 0);
-  cr_assert(dd->super.seq_num == dd->super.retries_max * 10 + 1, "%d", dd->super.seq_num);
+  cr_assert(dd->super.seq_num == dd->super.retries_max * 10 + 1,
+            "seq_num needs to be one larger than the number of insert attempts, found %d", dd->super.seq_num);
   assert_grabbed_log_contains("Error occurred while");
   assert_grabbed_log_contains("Multiple failures while sending");
 }
@@ -459,7 +473,8 @@ _flush_batched_message_error_success(LogThreadedDestDriver *s)
   return _inject_error_a_few_times(self);
 }
 
-Test(logthrdestdrv, when_batched_set_of_messages_result_in_error_the_entire_batch_is_attempted_again_and_then_successfully_delivered)
+Test(logthrdestdrv,
+     when_batched_set_of_messages_result_in_error_the_entire_batch_is_attempted_again_and_then_successfully_delivered)
 {
   gint total_attempts = FAILING_ATTEMPTS_DROP + 1;
 
